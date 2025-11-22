@@ -1,61 +1,56 @@
 import streamlit as st
 import numpy as np
 import cv2
-from PIL import Image
-import gdown
-import os
+import requests
+import tempfile
 from keras.models import load_model
 
-# ------------------------------
-# DESCARGAR MODELO DESDE DRIVE
-# ------------------------------
+# -------------------------------
+# 1) DESCARGAR TU MODELO DESDE DRIVE
+# -------------------------------
 
-MODEL_URL = "https://drive.google.com/uc?id=1HL3cChEPT45ozbK-DHFd5DiThsliLHc2"
-MODEL_PATH = "model.h5"
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1HL3cChEPT45ozbK-DHFd5DiThsliLHc2"
 
-# Si el modelo no existe en el servidor, descargarlo
-if not os.path.exists(MODEL_PATH):
-    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+@st.cache_resource
+def load_mvp_model():
+    response = requests.get(MODEL_URL)
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".h5")
+    temp.write(response.content)
+    temp.flush()
+    model = load_model(temp.name)
+    return model
 
-# ------------------------------
-# CARGAR MODELO
-# ------------------------------
-model = load_model(MODEL_PATH)
+model = load_mvp_model()
 
-# Clases (ajusta si usas otras)
-CLASSES = ["Abrir", "Mal"]
+# -------------------------------
+# 2) CONFIGURACIÓN DE LA APP
+# -------------------------------
 
-# ------------------------------
-# INTERFAZ STREAMLIT
-# ------------------------------
+st.title("🤟 MVP de LSM — Abrir vs Mal")
+st.write("Sube una imagen para clasificar la seña.")
 
-st.title("LSM – MVP (Clasificador sencillo)")
-st.write("Sube una imagen para predecir la seña:")
+uploaded = st.file_uploader("Subir imagen", type=["jpg", "jpeg", "png"])
 
-uploaded_file = st.file_uploader("Subir imagen", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
+if uploaded:
     # Mostrar imagen
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Imagen subida", use_column_width=True)
+    file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, 1)
 
-    # Convertir a array
-    img = np.array(image)
+    st.image(img, channels="BGR", caption="Imagen subida")
 
     # Preprocesar
-    img = cv2.resize(img, (224, 224))
-    img = img / 255.0
-    img = np.expand_dims(img, axis=0)
+    img_resized = cv2.resize(img, (224, 224))
+    img_norm = img_resized / 255.0
+    img_input = np.expand_dims(img_norm, axis=0)
 
-    # Predicción
-    pred = model.predict(img)
-    idx = np.argmax(pred)
-    confidence = pred[0][idx]
+    # Predecir
+    pred = model.predict(img_input)
+    clases = ["Abrir", "Mal"]
+    pred_index = np.argmax(pred)
 
-    st.subheader("Predicción:")
-    st.write(f"👉 **{CLASSES[idx]}**")
-    st.write(f"Confianza: {confidence:.2f}")
-
+    st.subheader("Resultado:")
+    st.write(f"**Predicción: {clases[pred_index]}**")
+    st.write("Probabilidades: ", pred.tolist())
 
 
 
