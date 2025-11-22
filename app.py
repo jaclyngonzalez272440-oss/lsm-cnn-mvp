@@ -1,57 +1,61 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
 import cv2
 from PIL import Image
 import gdown
 import os
+from keras.models import load_model
 
-# -----------------------------------
-# Descargar modelo desde Google Drive
-# -----------------------------------
+# ------------------------------
+# DESCARGAR MODELO DESDE DRIVE
+# ------------------------------
+
 MODEL_URL = "https://drive.google.com/uc?id=1HL3cChEPT45ozbK-DHFd5DiThsliLHc2"
-MODEL_FILE = "lsm_model_mvp.h5"
+MODEL_PATH = "model.h5"
 
-# Descargar si no existe
-if not os.path.isfile(MODEL_FILE):
-    with st.spinner("Descargando modelo..."):
-        gdown.download(MODEL_URL, MODEL_FILE, quiet=False)
+# Si el modelo no existe en el servidor, descargarlo
+if not os.path.exists(MODEL_PATH):
+    gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
 
-# Cargar modelo
-model = tf.keras.models.load_model(MODEL_FILE)
+# ------------------------------
+# CARGAR MODELO
+# ------------------------------
+model = load_model(MODEL_PATH)
 
+# Clases (ajusta si usas otras)
 CLASSES = ["Abrir", "Mal"]
 
-# -----------------------------------
-# Configuración de Streamlit
-# -----------------------------------
-st.set_page_config(page_title="LSM MVP", page_icon="🤟")
+# ------------------------------
+# INTERFAZ STREAMLIT
+# ------------------------------
 
-st.title("🤟 MVP Traductor de Señas LSM")
-st.write("Clasifica señas básicas como parte de un MVP educativo para tu proyecto.")
+st.title("LSM – MVP (Clasificador sencillo)")
+st.write("Sube una imagen para predecir la seña:")
 
-# -----------------------------------
-# Subir imagen
-# -----------------------------------
-img_file = st.file_uploader("Sube una imagen para clasificar", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Subir imagen", type=["jpg", "jpeg", "png"])
 
-if img_file:
-    image = Image.open(img_file)
-    st.image(image, caption="Imagen cargada", use_column_width=True)
+if uploaded_file is not None:
+    # Mostrar imagen
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Imagen subida", use_column_width=True)
 
-    # Preprocesamiento
+    # Convertir a array
     img = np.array(image)
+
+    # Preprocesar
     img = cv2.resize(img, (224, 224))
     img = img / 255.0
     img = np.expand_dims(img, axis=0)
 
     # Predicción
     pred = model.predict(img)
-    pred_class = CLASSES[np.argmax(pred)]
-    prob = np.max(pred)
+    idx = np.argmax(pred)
+    confidence = pred[0][idx]
 
-    st.subheader("Resultado:")
-    st.write(f"**Seña predicha:** {pred_class}")
-    st.write(f"**Probabilidad:** {prob:.2f}")
+    st.subheader("Predicción:")
+    st.write(f"👉 **{CLASSES[idx]}**")
+    st.write(f"Confianza: {confidence:.2f}")
+
+
 
 
