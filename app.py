@@ -54,3 +54,4 @@ if img_file:
     st.write(f"**Seña predicha:** {pred_class}")
     st.write(f"**Probabilidad:** {prob:.2f}")
 
+
